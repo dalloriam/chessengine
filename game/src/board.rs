@@ -74,9 +74,10 @@ impl Board {
         match &piece.piece_type {
             PieceType::Knight => self.validate_knight(src, dst)?,
             PieceType::Pawn => self.validate_pawn(src, dst, piece)?,
-            _ => {
-                unimplemented!()
-            }
+            PieceType::Rook => self.validate_rook(src, dst)?,
+            PieceType::King => self.validate_king(src, dst)?,
+            PieceType::Bishop => self.validate_bishop(src, dst)?,
+            PieceType::Queen => self.validate_queen(src, dst)?,
         }
 
         Ok(())

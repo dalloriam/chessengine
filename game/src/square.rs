@@ -96,6 +96,7 @@ impl From<Column> for usize {
 
 pub type Row = usize;
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct Square {
     pub col: Column,
     pub row: Row,

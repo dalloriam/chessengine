@@ -33,7 +33,7 @@ fn main() {
     let mut board = game::board_with_setup();
 
     loop {
-        render::render_board(&board, Color::White);
+        render::render_board(&board, Color::White, true);
         loop {
             match single_turn(&mut board) {
                 Ok(b) => {

@@ -4,29 +4,46 @@ use colored::*;
 
 use game::{constants::BOARD_DIMENSION, Board, Color as GameColor, Column, Piece, PieceType};
 
-fn render_piece(p: &Piece) -> String {
-    match p.color {
-        GameColor::White => match p.piece_type {
-            PieceType::Pawn => "♙",
-            PieceType::Rook => "♖",
-            PieceType::Bishop => "♗",
-            PieceType::Queen => "♕",
-            PieceType::King => "♔",
-            PieceType::Knight => "♘",
-        },
-        GameColor::Black => match p.piece_type {
-            PieceType::Pawn => "♟︎",
-            PieceType::Rook => "♜",
-            PieceType::Bishop => "♝",
-            PieceType::Queen => "♛",
-            PieceType::King => "♚",
-            PieceType::Knight => "♞",
-        },
+fn render_piece(p: &Piece, unicode: bool) -> String {
+    if unicode {
+        match p.color {
+            GameColor::White => match p.piece_type {
+                PieceType::Pawn => "♙",
+                PieceType::Rook => "♖",
+                PieceType::Bishop => "♗",
+                PieceType::Queen => "♕",
+                PieceType::King => "♔",
+                PieceType::Knight => "♘",
+            },
+            GameColor::Black => match p.piece_type {
+                PieceType::Pawn => "♟︎",
+                PieceType::Rook => "♜",
+                PieceType::Bishop => "♝",
+                PieceType::Queen => "♛",
+                PieceType::King => "♚",
+                PieceType::Knight => "♞",
+            },
+        }
+        .to_string()
+    } else {
+        let matched = match p.piece_type {
+            PieceType::Pawn => "o",
+            PieceType::Rook => "R",
+            PieceType::Bishop => "B",
+            PieceType::Queen => "Q",
+            PieceType::King => "K",
+            PieceType::Knight => "N",
+        };
+
+        match p.color {
+            GameColor::Black => matched.black().on_white(),
+            GameColor::White => matched.white().on_black(),
+        }
+        .to_string()
     }
-    .to_string()
 }
 
-pub fn render_board(board: &Board, perspective: GameColor) {
+pub fn render_board(board: &Board, perspective: GameColor, unicode: bool) {
     let mut board_repr = String::default();
 
     let row_range: Vec<_> = match perspective {
@@ -41,7 +58,7 @@ pub fn render_board(board: &Board, perspective: GameColor) {
         let mut row_str = String::default();
         for col_idx in coll_range.iter() {
             match &board.board[*col_idx][*row_idx] {
-                Some(p) => row_str += &format!("{} ", render_piece(p)),
+                Some(p) => row_str += &format!("{} ", render_piece(p, unicode)),
                 None => {
                     row_str += ". ";
                 }
