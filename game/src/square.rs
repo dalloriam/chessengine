@@ -123,6 +123,17 @@ impl Square {
         Ok(Square::new(col, row - 1))
     }
 
+    pub fn col_move(mut self, delta: i32) -> Option<Square> {
+        for _ in 0..delta.abs() {
+            if delta > 0 {
+                self = self.next_col()?;
+            } else {
+                self = self.prev_col()?;
+            }
+        }
+        Some(self)
+    }
+
     pub fn next_col(mut self) -> Option<Square> {
         let idx: usize = self.col.into();
         match Column::try_from(idx + 1) {
@@ -149,6 +160,17 @@ impl Square {
         }
     }
 
+    pub fn row_move(mut self, delta: i32) -> Option<Square> {
+        for _ in 0..delta.abs() {
+            if delta > 0 {
+                self = self.next_row()?;
+            } else {
+                self = self.prev_row()?;
+            }
+        }
+        Some(self)
+    }
+
     pub fn next_row(mut self) -> Option<Square> {
         if self.row < (BOARD_DIMENSION - 1) {
             self.row += 1;
@@ -165,5 +187,11 @@ impl Square {
         } else {
             None
         }
+    }
+
+    pub fn relative(mut self, col_delta: i32, row_delta: i32) -> Option<Square> {
+        self = self.row_move(row_delta)?;
+        self = self.col_move(col_delta)?;
+        Some(self)
     }
 }

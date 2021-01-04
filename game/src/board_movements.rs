@@ -2,9 +2,56 @@ use snafu::ensure;
 
 use crate::board::*;
 use crate::constants::*;
-use crate::{Color, Piece, Square};
+use crate::{Color, Column, Piece, Square};
 
 impl Board {
+    fn validate_line_clear(
+        &self,
+        src: &Square,
+        dst: &Square,
+        col_delta: i32,
+        row_delta: i32,
+    ) -> Result<(), MoveError> {
+        let mut s = src.clone();
+        loop {
+            s = s.relative(col_delta, row_delta).unwrap();
+            if &s == dst {
+                break;
+            }
+            ensure!(self.at(&s).is_none(), PathObstructed)
+        }
+
+        Ok(())
+    }
+
+    fn validate_line_threat(
+        &self,
+        src: &Square,
+        dst: &Square,
+        col_delta: i32,
+        row_delta: i32,
+        by_color: Color,
+    ) -> Result<(), MoveError> {
+        let mut s = src.clone();
+        ensure!(
+            !self.validate_square_threatened(src, by_color),
+            CannotCastle
+        );
+
+        loop {
+            s = s.relative(col_delta, row_delta).unwrap();
+            if &s == dst {
+                break;
+            }
+            ensure!(
+                !self.validate_square_threatened(&s, by_color),
+                CannotCastleThroughCheck
+            );
+        }
+
+        Ok(())
+    }
+
     pub(crate) fn validate_knight(&self, src: &Square, dst: &Square) -> Result<(), MoveError> {
         let coll_diff_abs = ((usize::from(src.col) as i16) - (usize::from(dst.col) as i16)).abs();
         let row_diff_abs = ((src.row as i16) - (dst.row as i16)).abs();
@@ -26,93 +73,83 @@ impl Board {
     }
 
     pub(crate) fn validate_bishop(&self, src: &Square, dst: &Square) -> Result<(), MoveError> {
-        let col_diff = usize::from(dst.col) as i16 - usize::from(src.col) as i16;
-        let coll_diff_abs = col_diff.abs();
+        let col_diff = usize::from(dst.col) as i32 - usize::from(src.col) as i32;
+        let col_diff_abs = col_diff.abs();
 
-        let row_diff = dst.row as i16 - src.row as i16;
+        let row_diff = dst.row as i32 - src.row as i32;
         let row_diff_abs = row_diff.abs();
 
-        let mut current_square = src.clone();
-
         // Validate we're actually moving in a straight diagonal.
-        ensure!(coll_diff_abs == row_diff_abs, InvalidMove);
+        ensure!(col_diff_abs == row_diff_abs, InvalidMove);
 
-        loop {
-            // Update the square.
-            if col_diff > 0 {
-                current_square = current_square.next_col().unwrap();
-            } else {
-                assert!(col_diff < 0);
-                current_square = current_square.prev_col().unwrap();
-            }
-
-            if row_diff > 0 {
-                current_square = current_square.next_row().unwrap();
-            } else {
-                assert!(row_diff < 0);
-                current_square = current_square.prev_row().unwrap();
-            }
-
-            if &current_square == dst {
-                break;
-            }
-
-            // Validate that no pieces are in the way.
-            ensure!(
-                self.board[usize::from(current_square.col)][current_square.row].is_none(),
-                PathObstructed
-            );
-        }
+        // Validate the line is clear.
+        let direction_col = col_diff / col_diff_abs;
+        let direction_row = row_diff / row_diff_abs;
+        self.validate_line_clear(&src, dst, direction_col, direction_row)?;
 
         Ok(())
     }
 
     pub(crate) fn validate_king(&self, src: &Square, dst: &Square) -> Result<(), MoveError> {
-        let coll_diff_abs = ((usize::from(src.col) as i16) - (usize::from(dst.col) as i16)).abs();
+        let coll_diff = usize::from(dst.col) as i32 - usize::from(src.col) as i32;
+        let coll_diff_abs = coll_diff.abs();
         let row_diff_abs = ((src.row as i16) - (dst.row as i16)).abs();
 
-        // Validate that the king can move one space in any direction.
-        ensure!(coll_diff_abs <= 1 && row_diff_abs <= 1, InvalidMove);
+        if coll_diff_abs == 2 {
+            // Validate castling.
+            ensure!(row_diff_abs == 0, InvalidMove); // Don't allow vertical movements when castling.
 
-        // TODO: Implement castling.
+            // Make sure the king hasn't moved.
+            ensure!(!self.at(src).unwrap().moved_once, CannotCastle);
+
+            // Get the square of the right rook.
+            let rook_square = {
+                if coll_diff > 0 {
+                    // Kingside castling.
+                    Square::new(Column::H, src.row)
+                } else {
+                    // Queenside castling
+                    Square::new(Column::A, src.row)
+                }
+            };
+
+            // Make sure the rook is there & hasn't moved.
+            let rook_maybe = self.at(&rook_square);
+            ensure!(rook_maybe.is_some(), CannotCastle);
+            ensure!(!rook_maybe.unwrap().moved_once, CannotCastle);
+
+            // Make sure the line is clear.
+            let coll_delta = coll_diff / coll_diff_abs;
+            self.validate_line_clear(src, &rook_square, coll_delta, 0)?;
+            self.validate_line_threat(
+                src,
+                dst,
+                coll_delta,
+                0,
+                self.at(src).unwrap().color.opposite(),
+            )?
+        } else {
+            // Validate that the king can move one space in any direction.
+            ensure!(coll_diff_abs <= 1 && row_diff_abs <= 1, InvalidMove);
+        }
 
         Ok(())
     }
 
     pub(crate) fn validate_rook(&self, src: &Square, dst: &Square) -> Result<(), MoveError> {
-        let col_diff = usize::from(dst.col) as i16 - usize::from(src.col) as i16;
+        let col_diff = usize::from(dst.col) as i32 - usize::from(src.col) as i32;
         let coll_diff_abs = col_diff.abs();
 
-        let row_diff = dst.row as i16 - src.row as i16;
+        let row_diff = dst.row as i32 - src.row as i32;
         let row_diff_abs = row_diff.abs();
 
         // Validate that movement is in a straight line.
         ensure!(coll_diff_abs == 0 || row_diff_abs == 0, InvalidMove);
 
-        // Validate that there are no pieces on the way.
-        let movement_magnitude = coll_diff_abs + row_diff_abs;
-
-        let mut current_square = src.clone();
-        for _i in 0..(movement_magnitude - 1) {
-            // Update along the straight line.
-            if row_diff > 0 {
-                current_square = current_square.next_row().unwrap();
-            } else if row_diff < 0 {
-                current_square = current_square.prev_row().unwrap();
-            } else if col_diff > 0 {
-                current_square = current_square.next_col().unwrap();
-            } else if col_diff < 0 {
-                current_square = current_square.prev_col().unwrap();
-            } else {
-                panic!("invalid move")
-            }
-
-            // Check that the square is not occupied.
-            ensure!(
-                self.board[usize::from(current_square.col)][current_square.row].is_none(),
-                PathObstructed
-            );
-        }
+        // Validate the line is clear.
+        let direction_col = col_diff / coll_diff_abs;
+        let direction_row = row_diff / row_diff_abs;
+        self.validate_line_clear(&src, &dst, direction_col, direction_row)?;
 
         Ok(())
     }
@@ -142,7 +179,7 @@ impl Board {
         };
 
         let coll_diff_abs = (usize::from(src.col) as i16 - usize::from(dst.col) as i16).abs();
-        let target_piece_maybe = self.board[usize::from(dst.col)][dst.row].as_ref();
+        let target_piece_maybe = self.at(dst);
 
         if coll_diff_abs > 0 {
             // Handle captures.
