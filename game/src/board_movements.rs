@@ -2,10 +2,10 @@ use snafu::ensure;
 
 use crate::board::*;
 use crate::constants::*;
-use crate::{Color, Column, Piece, Square};
+use crate::{Color, Piece, Square};
 
 impl Board {
-    fn validate_line_clear(
+    pub(crate) fn validate_line_clear(
         &self,
         src: &Square,
         dst: &Square,
@@ -24,7 +24,7 @@ impl Board {
         Ok(())
     }
 
-    fn validate_line_threat(
+    pub(crate) fn validate_line_threat(
         &self,
         src: &Square,
         dst: &Square,
@@ -99,35 +99,19 @@ impl Board {
             // Validate castling.
             ensure!(row_diff_abs == 0, InvalidMove); // Don't allow vertical movements when castling.
 
-            // Make sure the king hasn't moved.
-            ensure!(!self.at(src).unwrap().moved_once, CannotCastle);
-
             // Get the square of the right rook.
-            let rook_square = {
+            let castle_state = self.get_castle_state(self.at(src).unwrap().color);
+            let attempted_castle = {
                 if coll_diff > 0 {
-                    // Kingside castling.
-                    Square::new(Column::H, src.row)
+                    CastleState::Kingside
                 } else {
-                    // Queenside castling
-                    Square::new(Column::A, src.row)
+                    CastleState::Queenside
                 }
             };
-
-            // Make sure the rook is there & hasn't moved.
-            let rook_maybe = self.at(&rook_square);
-            ensure!(rook_maybe.is_some(), CannotCastle);
-            ensure!(!rook_maybe.unwrap().moved_once, CannotCastle);
-
-            // Make sure the line is clear.
-            let coll_delta = coll_diff / coll_diff_abs;
-            self.validate_line_clear(src, &rook_square, coll_delta, 0)?;
-            self.validate_line_threat(
-                src,
-                dst,
-                coll_delta,
-                0,
-                self.at(src).unwrap().color.opposite(),
-            )?
+            ensure!(
+                castle_state == CastleState::Both || castle_state == attempted_castle,
+                CannotCastle
+            );
         } else {
             // Validate that the king can move one space in any direction.
             ensure!(coll_diff_abs <= 1 && row_diff_abs <= 1, InvalidMove);
@@ -147,8 +131,20 @@ impl Board {
         ensure!(coll_diff_abs == 0 || row_diff_abs == 0, InvalidMove);
 
         // Validate the line is clear.
-        let direction_col = col_diff / coll_diff_abs;
-        let direction_row = row_diff / row_diff_abs;
+        let direction_col = {
+            if coll_diff_abs == 0 {
+                0
+            } else {
+                col_diff / coll_diff_abs
+            }
+        };
+        let direction_row = {
+            if row_diff_abs == 0 {
+                0
+            } else {
+                row_diff / row_diff_abs
+            }
+        };
         self.validate_line_clear(&src, &dst, direction_col, direction_row)?;
 
         Ok(())

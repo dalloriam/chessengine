@@ -1,6 +1,7 @@
 mod board;
 mod board_movements;
 pub mod constants;
+mod fen;
 mod pieces;
 mod setup;
 mod square;

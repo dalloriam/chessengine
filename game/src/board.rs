@@ -1,7 +1,34 @@
 use snafu::{ensure, ResultExt, Snafu};
 
-use crate::{constants::BOARD_DIMENSION, Column};
-use crate::{Color, NotationError, Piece, PieceType, Square};
+use crate::constants::BOARD_DIMENSION;
+use crate::fen::ToFen;
+use crate::{Color, Column, NotationError, Piece, PieceType, Square};
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum CastleState {
+    Kingside,
+    Queenside,
+    Both,
+    None,
+}
+
+impl ToFen for CastleState {
+    fn to_fen(&self, color: Color) -> String {
+        let s = match self {
+            CastleState::Both => "kq",
+            CastleState::Kingside => "k",
+            CastleState::Queenside => "q",
+            CastleState::None => "",
+        }
+        .to_string();
+
+        if color == Color::White {
+            s.to_uppercase()
+        } else {
+            s
+        }
+    }
+}
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
@@ -70,6 +97,62 @@ impl Board {
         let piece_maybe = self.at_mut(square);
         assert!(piece_maybe.is_none());
         piece_maybe.replace(piece);
+    }
+
+    pub(crate) fn get_castle_state(&self, color: Color) -> CastleState {
+        let king_pos = match color {
+            Color::Black => &self.black_king_position,
+            Color::White => &self.white_king_position,
+        };
+
+        let king = self.at(king_pos).unwrap();
+        if king.moved_once {
+            return CastleState::None;
+        }
+
+        let mut castle_state = CastleState::None;
+        for (rook_square, partial_state) in &[
+            (Square::new(Column::H, king_pos.row), CastleState::Kingside),
+            (Square::new(Column::A, king_pos.row), CastleState::Queenside),
+        ] {
+            let rook_maybe = self.at(rook_square);
+            if rook_maybe.is_none() {
+                continue;
+            }
+            if rook_maybe.unwrap().moved_once {
+                continue;
+            }
+
+            // Make sure the line is clear.
+            let coll_diff = usize::from(rook_square.col) as i32 - usize::from(king_pos.col) as i32;
+            let coll_delta = coll_diff / coll_diff.abs();
+            if self
+                .validate_line_clear(king_pos, &rook_square, coll_delta, 0)
+                .is_err()
+            {
+                continue;
+            }
+
+            if self
+                .validate_line_threat(
+                    &king_pos,
+                    &rook_square,
+                    coll_delta,
+                    0,
+                    self.at(king_pos).unwrap().color.opposite(),
+                )
+                .is_ok()
+            {
+                // Castling is valid.
+                if castle_state == CastleState::None {
+                    castle_state = *partial_state;
+                } else {
+                    castle_state = CastleState::Both;
+                }
+            }
+        }
+
+        return castle_state;
     }
 
     pub(crate) fn validate_square_threatened(&self, square: &Square, by_color: Color) -> bool {
