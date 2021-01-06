@@ -162,7 +162,7 @@ impl Board {
                 Color::White => WHITE_PAWN_ROW,
             };
 
-        let row_diff = {
+        let row_diff_rel = {
             let diff = dst.row as i16 - src.row as i16;
 
             // Make sure pawns can only move in one direction.
@@ -171,8 +171,10 @@ impl Board {
             } else {
                 ensure!(diff >= 0, InvalidMove);
             }
-            diff.abs()
+
+            diff
         };
+        let row_diff = row_diff_rel.abs();
 
         let coll_diff_abs = (usize::from(src.col) as i16 - usize::from(dst.col) as i16).abs();
         let target_piece_maybe = self.at(dst);
@@ -184,11 +186,24 @@ impl Board {
             // Move must be a single diagonal.
             ensure!(coll_diff_abs == 1 && row_diff == 1, InvalidMove);
 
-            // There has to be a piece of the opposite color on the target square.
-            ensure!(
-                target_piece_maybe.is_some() && target_piece_maybe.unwrap().color != piece.color,
-                InvalidMove
-            );
+            if let Some(en_passant_square) = self.en_passant_square.as_ref() {
+                // En passant square must be one row behind dst square.
+                let invert_row_diff = -row_diff_rel;
+                ensure!(
+                    &dst.clone().relative(0, invert_row_diff as i32).unwrap() == en_passant_square,
+                    InvalidMove
+                );
+
+                // Target square must be empty.
+                ensure!(target_piece_maybe.is_none(), InvalidMove);
+            } else {
+                // There has to be a piece of the opposite color on the target square.
+                ensure!(
+                    target_piece_maybe.is_some()
+                        && target_piece_maybe.unwrap().color != piece.color,
+                    InvalidMove
+                );
+            }
         } else {
             // Handle regular movement.
             if pawn_did_move {

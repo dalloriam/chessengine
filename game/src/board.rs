@@ -66,6 +66,8 @@ pub struct Board {
 
     black_king_position: Square,
     white_king_position: Square,
+
+    pub(crate) en_passant_square: Option<Square>,
 }
 
 impl Default for Board {
@@ -74,6 +76,7 @@ impl Default for Board {
             board: Default::default(),
             black_king_position: Square::new(Column::E, 7),
             white_king_position: Square::new(Column::E, 0),
+            en_passant_square: None,
         }
     }
 }
@@ -242,17 +245,51 @@ impl Board {
         let mut new_position = self.clone();
 
         let piece = new_position.at_mut(src).take().unwrap(); // Unwrap safe because validate move throws.
-        let _captured_maybe = new_position.at_mut(dst).replace(piece.clone());
+
+        let coll_diff = usize::from(dst.col) as i32 - usize::from(src.col) as i32;
+
+        let _captured_maybe = {
+            let en_passant = new_position.at(dst).is_none()
+                && piece.piece_type == PieceType::Pawn
+                && coll_diff != 0;
+
+            let mut captured = new_position.at_mut(dst).replace(piece.clone());
+
+            if en_passant {
+                assert!(new_position.en_passant_square.is_some());
+                let captured_pawn = new_position
+                    .at_mut(&new_position.en_passant_square.clone().unwrap())
+                    .take()
+                    .unwrap();
+                captured.replace(captured_pawn);
+            }
+
+            captured
+        };
         // TODO: Do something with the captured piece.
 
-        if piece.piece_type == PieceType::King {
-            // Update the king position so we can make sure it's not in check.
-            match &piece.color {
-                Color::Black => {
-                    new_position.black_king_position = dst.clone();
+        // Reset en-passant
+        if self.en_passant_square.is_some() {
+            new_position.en_passant_square = None;
+        }
+
+        match &piece.piece_type {
+            PieceType::King => {
+                // Update the king position so we can make sure it's not in check.
+                match &piece.color {
+                    Color::Black => {
+                        new_position.black_king_position = dst.clone();
+                    }
+                    Color::White => new_position.white_king_position = dst.clone(),
                 }
-                Color::White => new_position.white_king_position = dst.clone(),
             }
+            PieceType::Pawn => {
+                let row_diff_abs = ((src.row as i16) - (dst.row as i16)).abs();
+                if row_diff_abs == 2 {
+                    new_position.en_passant_square = Some(dst.clone());
+                }
+            }
+            _ => {}
         }
 
         ensure!(!new_position.validate_check(piece.color), PutSelfInCheck);
@@ -261,7 +298,6 @@ impl Board {
         // TODO: Implement castling.
         new_position.at_mut(dst).as_mut().unwrap().moved_once = true;
 
-        let coll_diff = usize::from(dst.col) as i32 - usize::from(src.col) as i32;
         if piece.piece_type == PieceType::King && coll_diff.abs() == 2 {
             // If we reached here we just castled.
             // We need to move the corresponding rook as well.
