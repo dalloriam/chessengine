@@ -11,7 +11,7 @@ pub enum CastleState {
     None,
 }
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Snafu, PartialEq)]
 #[snafu(visibility(pub(crate)))]
 pub enum MoveError {
     #[snafu(display("There is no piece there!"))]
@@ -52,8 +52,8 @@ pub struct Board {
     pub(crate) full_move_clock: usize,
     pub(crate) half_move_clock: usize,
 
-    black_king_position: Square,
-    white_king_position: Square,
+    pub(crate) black_king_position: Square,
+    pub(crate) white_king_position: Square,
 
     pub(crate) en_passant_square: Option<Square>,
 }
@@ -128,14 +128,27 @@ impl Board {
     }
 
     pub(crate) fn validate_square_threatened(&self, square: &Square, by_color: Color) -> bool {
+        println!("Checking for threats to {} by {:?}", square, by_color);
+
         // Check for threats by knights.
-        for col_move in &[1, 2, -1, -2] {
-            for row_move in &[1, 2, -1, -2] {
-                if let Some(attacker) = square.clone().relative(*col_move, *row_move) {
-                    if let Some(atk_piece) = self.at(&attacker) {
-                        if atk_piece.color == by_color {
-                            return true;
-                        }
+        for (col_move, row_move) in &[
+            (1, 2),
+            (-1, 2),
+            (1, -2),
+            (-1, -2),
+            (2, 1),
+            (2, -1),
+            (-2, 1),
+            (-2, -1),
+        ] {
+            if let Some(attacker) = square.clone().relative(*col_move, *row_move) {
+                if let Some(atk_piece) = self.at(&attacker) {
+                    if atk_piece.piece_type == PieceType::Knight && atk_piece.color == by_color {
+                        println!(
+                            "{} threatened by {:?} at {}",
+                            square, atk_piece.piece_type, attacker,
+                        );
+                        return true;
                     }
                 }
             }
@@ -149,6 +162,8 @@ impl Board {
                     continue;
                 }
 
+                let is_diagonal = (*col_delta as i32).abs() > 0 && (*row_delta as i32).abs() > 0;
+
                 let mut lat_square_pos = square.clone();
                 while let Some(s) = lat_square_pos.relative(*col_delta, *row_delta) {
                     if let Some(atk_piece) = self.at(&s) {
@@ -156,7 +171,30 @@ impl Board {
                             // Line of sight is blocked by friendly piece.
                             break;
                         } else {
-                            return true;
+                            if is_diagonal {
+                                if atk_piece.piece_type == PieceType::Bishop
+                                    || atk_piece.piece_type == PieceType::Queen
+                                {
+                                    return true;
+                                }
+
+                                if atk_piece.piece_type == PieceType::Pawn
+                                    && (usize::from(square.col) as i16 - usize::from(s.col) as i16)
+                                        .abs()
+                                        == 1
+                                    && (square.row as i16 - s.row as i16).abs() == 1
+                                {
+                                    println!("THREATENED HERE");
+                                    return true;
+                                }
+                            }
+
+                            if !is_diagonal
+                                && (atk_piece.piece_type == PieceType::Rook
+                                    || atk_piece.piece_type == PieceType::Queen)
+                            {
+                                return true;
+                            }
                         }
                     }
                     lat_square_pos = s;

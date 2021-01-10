@@ -6,7 +6,7 @@ use snafu::{ensure, ResultExt, Snafu};
 
 use crate::constants::BOARD_DIMENSION;
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Snafu, PartialEq)]
 pub enum Error {
     ParseError,
     InvalidColumn,
@@ -116,6 +116,12 @@ pub type Row = usize;
 pub struct Square {
     pub col: Column,
     pub row: Row,
+}
+
+impl fmt::Display for Square {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{}", String::from(self.col), self.row + 1)
+    }
 }
 
 impl From<Square> for String {
