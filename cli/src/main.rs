@@ -20,7 +20,7 @@ pub fn prompt(msg: &str) -> io::Result<String> {
 
 fn single_turn(board: &mut Board) -> Result<Board> {
     let r = prompt("Enter your move: ").unwrap();
-    let v: Vec<_> = r.split(" ").collect();
+    let v: Vec<_> = r.split(' ').collect();
     if v.len() != 2 {
         return Err(anyhow!("Invalid move"));
     }

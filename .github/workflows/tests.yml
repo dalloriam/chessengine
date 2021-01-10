@@ -17,7 +17,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: "target"
-          key: shift-cache
+          key: chessengine-cache
 
       - name: Test
         uses: actions-rs/cargo@v1

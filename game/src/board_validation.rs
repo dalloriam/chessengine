@@ -194,7 +194,6 @@ impl Board {
 
         if coll_diff_abs > 0 {
             // Handle captures.
-            // TODO: Implement en passant.
 
             // Move must be a single diagonal.
             ensure!(coll_diff_abs == 1 && row_diff == 1, InvalidMove);

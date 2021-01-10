@@ -139,7 +139,7 @@ impl Square {
     pub fn from_notation<T: AsRef<str>>(notation: T) -> Result<Square, Error> {
         ensure!(notation.as_ref().len() == 2, ParseError);
         let col = {
-            let ch = notation.as_ref().chars().nth(0).unwrap();
+            let ch = notation.as_ref().chars().next().unwrap();
             Column::try_from(ch.to_string().to_uppercase())?
         };
         let row = {

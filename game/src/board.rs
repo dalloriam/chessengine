@@ -124,7 +124,7 @@ impl Board {
             }
         }
 
-        return castle_state;
+        castle_state
     }
 
     pub(crate) fn validate_square_threatened(&self, square: &Square, by_color: Color) -> bool {
@@ -202,7 +202,7 @@ impl Board {
             }
         }
 
-        return false;
+        false
     }
 
     fn validate_check(&self, color: Color) -> bool {
@@ -315,7 +315,6 @@ impl Board {
         ensure!(!new_position.validate_check(piece.color), PutSelfInCheck);
 
         // Mark this piece as moved (used for tracking castling.)
-        // TODO: Implement castling.
         new_position.at_mut(dst).as_mut().unwrap().moved_once = true;
 
         if piece.piece_type == PieceType::King && coll_diff.abs() == 2 {

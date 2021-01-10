@@ -59,13 +59,13 @@ impl Board {
 
         // Make sure FEN string is split in 6 chunks.
         let fen_ref = fen.as_ref().trim();
-        let chunks: Vec<_> = fen_ref.split(" ").collect();
+        let chunks: Vec<_> = fen_ref.split(' ').collect();
         ensure!(chunks.len() == 6, InvalidFEN);
 
         // Load board state.
         let board_state = chunks[0];
         let mut row_count = 0;
-        for row in board_state.split("/") {
+        for row in board_state.split('/') {
             let row_index = BOARD_DIMENSION - 1 - row_count;
             let mut col_index: usize = 0;
             for ch in row.chars() {
@@ -122,10 +122,10 @@ impl Board {
 
         // Load castle state.
         {
-            let white_queenside = chunks[2].contains("Q");
-            let white_kingside = chunks[2].contains("K");
-            let black_kingside = chunks[2].contains("k");
-            let black_queenside = chunks[2].contains("q");
+            let white_queenside = chunks[2].contains('Q');
+            let white_kingside = chunks[2].contains('K');
+            let black_kingside = chunks[2].contains('k');
+            let black_queenside = chunks[2].contains('q');
 
             if !(white_queenside || white_kingside) {
                 // Can't castle at all, mark the king as moved.
