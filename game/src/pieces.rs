@@ -13,6 +13,16 @@ impl Color {
     }
 }
 
+impl From<Color> for String {
+    fn from(c: Color) -> Self {
+        match c {
+            Color::White => "w",
+            Color::Black => "b",
+        }
+        .to_string()
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PieceType {
     Pawn,
@@ -21,6 +31,20 @@ pub enum PieceType {
     Rook,
     Queen,
     King,
+}
+
+impl From<PieceType> for String {
+    fn from(s: PieceType) -> Self {
+        match s {
+            PieceType::Pawn => "p",
+            PieceType::Bishop => "b",
+            PieceType::King => "k",
+            PieceType::Knight => "n",
+            PieceType::Rook => "r",
+            PieceType::Queen => "q",
+        }
+        .to_string()
+    }
 }
 
 #[derive(Clone, Debug)]

@@ -31,6 +31,8 @@ fn single_turn(board: &mut Board) -> Result<Board> {
 
 fn main() {
     let mut board = game::board_with_setup();
+    let fen = board.to_fen();
+    println!("{}", fen);
 
     loop {
         render::render_board(&board, Color::Black, true);
@@ -39,6 +41,10 @@ fn main() {
                 Ok(b) => {
                     // Turn successful, update the board.
                     board = b;
+
+                    // Get FEN notation.
+                    let fen = board.to_fen();
+                    println!("{}", fen);
                     break;
                 }
                 Err(e) => {

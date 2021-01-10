@@ -1,7 +1,6 @@
 use snafu::{ensure, ResultExt, Snafu};
 
 use crate::constants::BOARD_DIMENSION;
-use crate::fen::ToFen;
 use crate::{Color, Column, NotationError, Piece, PieceType, Square};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -10,24 +9,6 @@ pub enum CastleState {
     Queenside,
     Both,
     None,
-}
-
-impl ToFen for CastleState {
-    fn to_fen(&self, color: Color) -> String {
-        let s = match self {
-            CastleState::Both => "kq",
-            CastleState::Kingside => "k",
-            CastleState::Queenside => "q",
-            CastleState::None => "",
-        }
-        .to_string();
-
-        if color == Color::White {
-            s.to_uppercase()
-        } else {
-            s
-        }
-    }
 }
 
 #[derive(Debug, Snafu)]
@@ -56,6 +37,9 @@ pub enum MoveError {
 
     #[snafu(display("Cannot castle through check."))]
     CannotCastleThroughCheck,
+
+    #[snafu(display("Not your turn to play."))]
+    WrongPlayer,
 }
 
 type Result<T> = std::result::Result<T, MoveError>;
@@ -63,6 +47,10 @@ type Result<T> = std::result::Result<T, MoveError>;
 #[derive(Clone, Debug)]
 pub struct Board {
     pub board: [[Option<Piece>; BOARD_DIMENSION]; BOARD_DIMENSION],
+
+    pub(crate) to_play: Color,
+    pub(crate) full_move_clock: usize,
+    pub(crate) half_move_clock: usize,
 
     black_king_position: Square,
     white_king_position: Square,
@@ -74,6 +62,9 @@ impl Default for Board {
     fn default() -> Self {
         Self {
             board: Default::default(),
+            to_play: Color::White,
+            full_move_clock: 1,
+            half_move_clock: 0,
             black_king_position: Square::new(Column::E, 7),
             white_king_position: Square::new(Column::E, 0),
             en_passant_square: None,
@@ -126,32 +117,10 @@ impl Board {
                 continue;
             }
 
-            // Make sure the line is clear.
-            let coll_diff = usize::from(rook_square.col) as i32 - usize::from(king_pos.col) as i32;
-            let coll_delta = coll_diff / coll_diff.abs();
-            if self
-                .validate_line_clear(king_pos, &rook_square, coll_delta, 0)
-                .is_err()
-            {
-                continue;
-            }
-
-            if self
-                .validate_line_threat(
-                    &king_pos,
-                    &rook_square,
-                    coll_delta,
-                    0,
-                    self.at(king_pos).unwrap().color.opposite(),
-                )
-                .is_ok()
-            {
-                // Castling is valid.
-                if castle_state == CastleState::None {
-                    castle_state = *partial_state;
-                } else {
-                    castle_state = CastleState::Both;
-                }
+            if castle_state == CastleState::None {
+                castle_state = *partial_state;
+            } else {
+                castle_state = CastleState::Both;
             }
         }
 
@@ -243,12 +212,19 @@ impl Board {
         self.validate_move(src, dst)?;
 
         let mut new_position = self.clone();
+        new_position.to_play = self.to_play.opposite();
 
         let piece = new_position.at_mut(src).take().unwrap(); // Unwrap safe because validate move throws.
 
+        ensure!(piece.color == self.to_play, WrongPlayer);
+
+        if piece.color == Color::Black {
+            new_position.full_move_clock += 1;
+        }
+
         let coll_diff = usize::from(dst.col) as i32 - usize::from(src.col) as i32;
 
-        let _captured_maybe = {
+        let captured_maybe = {
             let en_passant = new_position.at(dst).is_none()
                 && piece.piece_type == PieceType::Pawn
                 && coll_diff != 0;
@@ -267,6 +243,12 @@ impl Board {
             captured
         };
         // TODO: Do something with the captured piece.
+
+        if piece.piece_type == PieceType::Pawn || captured_maybe.is_some() {
+            new_position.half_move_clock = 0;
+        } else {
+            new_position.half_move_clock += 1;
+        }
 
         // Reset en-passant
         if self.en_passant_square.is_some() {

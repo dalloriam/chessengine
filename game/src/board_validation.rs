@@ -2,7 +2,7 @@ use snafu::ensure;
 
 use crate::board::*;
 use crate::constants::*;
-use crate::{Color, Piece, Square};
+use crate::{Color, Column, Piece, Square};
 
 impl Board {
     pub(crate) fn validate_line_clear(
@@ -101,17 +101,30 @@ impl Board {
 
             // Get the square of the right rook.
             let castle_state = self.get_castle_state(self.at(src).unwrap().color);
-            let attempted_castle = {
+            let (attempted_castle, rook_square) = {
                 if coll_diff > 0 {
-                    CastleState::Kingside
+                    (CastleState::Kingside, Square::new(Column::H, src.row))
                 } else {
-                    CastleState::Queenside
+                    (CastleState::Queenside, Square::new(Column::A, src.row))
                 }
             };
+
             ensure!(
                 castle_state == CastleState::Both || castle_state == attempted_castle,
                 CannotCastle
             );
+
+            // Make sure the line is clear.
+            let coll_delta = coll_diff / coll_diff.abs();
+            self.validate_line_clear(src, &rook_square, coll_delta, 0)?;
+
+            self.validate_line_threat(
+                &src,
+                &rook_square,
+                coll_delta,
+                0,
+                self.at(src).unwrap().color.opposite(),
+            )?;
         } else {
             // Validate that the king can move one space in any direction.
             ensure!(coll_diff_abs <= 1 && row_diff_abs <= 1, InvalidMove);

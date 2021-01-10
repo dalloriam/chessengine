@@ -26,6 +26,22 @@ pub enum Column {
     H,
 }
 
+impl From<Column> for String {
+    fn from(c: Column) -> String {
+        match c {
+            Column::A => "a",
+            Column::B => "b",
+            Column::C => "c",
+            Column::D => "d",
+            Column::E => "e",
+            Column::F => "f",
+            Column::G => "g",
+            Column::H => "h",
+        }
+        .to_string()
+    }
+}
+
 impl fmt::Display for Column {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let ch = match self {
@@ -100,6 +116,12 @@ pub type Row = usize;
 pub struct Square {
     pub col: Column,
     pub row: Row,
+}
+
+impl From<Square> for String {
+    fn from(s: Square) -> Self {
+        format!("{}{}", String::from(s.col), s.row)
+    }
 }
 
 impl Square {
